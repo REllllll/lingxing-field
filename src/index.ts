@@ -1,4 +1,10 @@
 import { basekit, FieldType, field, FieldComponent, FieldCode, NumberFormatter, AuthorizationType, DateFormatter } from '@lark-opdev/block-basekit-server-api';
+import dotenv from 'dotenv';
+dotenv.config();
+import fs from 'fs';
+import path from 'path';
+const key_mapping = fs.readFileSync(path.join(__dirname, '../../../src/key_mapping.json'), 'utf-8');
+const keyMapping = JSON.parse(key_mapping);
 const { t } = field;
 
 const host = process.env.HOST || 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -8,25 +14,25 @@ basekit.addDomainList([host]);
 
 basekit.addField({
   // 定义捷径的i18n语言资源
-  i18n: {
-    messages: {
-      'zh-CN': {
-        'lingxing-appid': '人民币金额',
-        'lingxing-appsecret': '美元金额',
-        'rate': '汇率',
-      },
-      'en-US': {
-        'rmb': 'RMB Amount',
-        'usd': 'Dollar amount',
-        'rate': 'Exchange Rate',
-      },
-      'ja-JP': {
-        'rmb': '人民元の金額',
-        'usd': 'ドル金額',
-        'rate': '為替レート',
-      },
-    }
-  },
+  // i18n: {
+  //   messages: {
+  //     'zh-CN': {
+  //       'lingxing-appid': '人民币金额',
+  //       'lingxing-appsecret': '美元金额',
+  //       'rate': '汇率',
+  //     },
+  //     'en-US': {
+  //       'rmb': 'RMB Amount',
+  //       'usd': 'Dollar amount',
+  //       'rate': 'Exchange Rate',
+  //     },
+  //     'ja-JP': {
+  //       'rmb': '人民元の金額',
+  //       'usd': 'ドル金額',
+  //       'rate': '為替レート',
+  //     },
+  //   }
+  // },
   // 定义捷径的入参
   formItems: [
     // ASIN 来源字段选择
@@ -72,6 +78,20 @@ basekit.addField({
       tooltips: [{
         type: 'text',
         content: '请选择结束日期字段'
+      }]
+    },
+    {
+      key: 'mid_field',
+      label: '站点id字段',
+      component: FieldComponent.FieldSelect,
+      props: {
+        supportType: [FieldType.Number],
+        mode: 'single'
+      },
+      validator: { required: true },
+      tooltips: [{
+        type: 'text',
+        content: '请选择站点id字段'
       }]
     }
   ],
@@ -248,23 +268,27 @@ basekit.addField({
   execute: async (formItemParams: { [key: string]: any }, context: any) => {
     const { asin_field, start_date_field, end_date_field } = formItemParams;
     const asin = asin_field[0]['text'];
+    const mid = formItemParams.mid_field
     const start_date = new Date(start_date_field).toISOString().split('T')[0];
     const end_date = new Date(end_date_field).toISOString().split('T')[0];
     const body = {
       "data": {
-      "offset": 0,
-      "length": 20,
-      "sort_field": "volume",
-      "sort_type": "desc",
-      "search_field": "asin",
-      "search_value": [asin],
-      "mid": 1,
-      "sid": [1, 109],
-      "start_date": start_date,
-      "end_date": end_date
+        "offset": 0,
+        "length": 20,
+        "sort_field": "volume",
+        "sort_type": "desc",
+        "search_field": "asin",
+        "search_value": [asin],
+        "mid": mid,
+        "start_date": start_date,
+        "end_date": end_date,
+        "summary_field": "asin"
       },
       "path": "/bd/productPerformance/openApi/asinList"
     };
+
+    console.log('====body', body);
+
     const { account = 0 } = formItemParams;
     /** 为方便查看日志，使用此方法替代console.log */
     function debugLog(arg: any) {
@@ -276,34 +300,92 @@ basekit.addField({
     }
 
     try {
-      const res = await context.fetch(host, { // 已经在addDomainList中添加为白名单的请求
+      const res = await context.fetch('https://' + host + '/api/proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       }).then(res => res.json());
-      const keyMapping = await context.readFile('src/key_mapping.json').then(res => JSON.parse(res));
-      const mappedData = res.data.map((item: any) => {
+
+      console.log('====res', res);
+      if (!res || !res.data || !Array.isArray(res.data.list)) {
+        console.log('API 返回数据无效:', res);
+        throw new Error('API 返回数据无效或格式不正确');
+      }
+
+      // 递归提取最末端的键值对
+      function extractLeafData(obj: any): Record<string, any> {
+        let result: Record<string, any> = {};
+        Object.keys(obj).forEach(key => {
+          const value = obj[key];
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // 如果是对象，递归提取
+        Object.assign(result, extractLeafData(value));
+          } else if (Array.isArray(value)) {
+        // 如果是数组，仅处理第一个元素
+        if (value.length > 0) {
+          const firstElement = value[0];
+          if (typeof firstElement === 'object') {
+            Object.assign(result, extractLeafData(firstElement));
+          } else {
+            result[key] = String(value);
+          }
+        } else {
+          result[key] = String(value);
+        }
+          } else {
+        // 如果是基本类型，直接添加到结果中
+        result[key] = String(value);
+          }
+        });
+        return result;
+      }
+
+      // 检查是否有值为 null 的字段，如果有则将其转换为字符串 'null'
+      function convertNullToString(obj: any): any {
+        if (obj === null) {
+          return 'null';
+        } else if (Array.isArray(obj)) {
+          return obj.map(item => convertNullToString(item));
+        } else if (typeof obj === 'object') {
+          const newObj: any = {};
+          Object.keys(obj).forEach(key => {
+            newObj[key] = convertNullToString(obj[key]);
+          });
+          return newObj;
+        }
+        return obj;
+      }
+      // 遍历 res.data.list 并转换 null 值
+      res.data.list = res.data.list.map((item: any) => {
+        return convertNullToString(item);
+      });
+
+      // 遍历 res.data.list 并映射数据
+      const mappedData = res.data.list.map((item: any) => {
+        const flatData = extractLeafData(item); // 提取所有最末端数据
         const mappedItem: any = {};
         Object.keys(keyMapping).forEach(key => {
-          if (item[key] !== undefined) {
-        mappedItem[keyMapping[key]] = item[key];
+          if (flatData[key] !== undefined) {
+            mappedItem[keyMapping[key]] = flatData[key];
           }
         });
         return mappedItem;
       });
 
+      mappedData[0].id = asin; // 添加 id 字段
+
       return {
         code: FieldCode.Success,
-        data: mappedData
+        data: mappedData[0]
       };
     } catch (e) {
       console.log('====error', String(e));
       debugLog(e);
       return {
         code: FieldCode.Error,
-      }
+      };
     }
   },
 });
