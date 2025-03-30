@@ -1,9 +1,11 @@
 import { basekit, FieldType, field, FieldComponent, FieldCode, NumberFormatter, AuthorizationType, DateFormatter } from '@lark-opdev/block-basekit-server-api';
 import dotenv from 'dotenv';
-dotenv.config();
 import fs from 'fs';
 import path from 'path';
-const key_mapping = fs.readFileSync(path.join(__dirname, '../../../src/key_mapping.json'), 'utf-8');
+dotenv.config({
+  path: path.join(__dirname, '.env')
+});
+const key_mapping = fs.readFileSync(path.join(__dirname, 'key_mapping.json'), 'utf-8');
 const keyMapping = JSON.parse(key_mapping);
 const { t } = field;
 
