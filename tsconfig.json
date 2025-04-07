@@ -18,7 +18,9 @@
     "checkJs": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "key_mappings/**/*.json",
+    ".env",
   ],
   "exclude": [
     "node_modules/**"
