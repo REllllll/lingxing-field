@@ -2,7 +2,7 @@ import { basekit, FieldType, field, FieldComponent, FieldCode, NumberFormatter, 
 import { keyMapping } from './keyMapping';
 const { t } = field;
 
-const domain = 'cs2skins.wildog.vip';
+const domain = '42kuajing.com';
 // 通过addDomainList添加请求接口的域名
 basekit.addDomainList([domain]);
 
