@@ -258,8 +258,8 @@ basekit.addField({
     const { asin_field, start_date_field, end_date_field } = formItemParams;
     const asin = asin_field[0]['text'];
     const mid = formItemParams.mid_field
-    const start_date = new Date(start_date_field).toISOString().split('T')[0];
-    const end_date = new Date(end_date_field).toISOString().split('T')[0];
+    const start_date = new Date(start_date_field).toLocaleDateString('en-CA'); // YYYY-MM-DD 格式
+    const end_date = new Date(end_date_field).toLocaleDateString('en-CA');
     const body = {
       "data": {
         "offset": 0,
