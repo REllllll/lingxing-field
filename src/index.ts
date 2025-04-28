@@ -88,6 +88,21 @@ basekit.addField({
         type: 'text',
         content: '请选择站点id字段'
       }]
+    },
+    // 是否强制更新
+    {
+      key: 'force_update',
+      label: '是否强制更新',
+      component: FieldComponent.FieldSelect,
+      props: {
+        supportType: [FieldType.Number],
+        mode: 'single'
+      },
+      validator: { required: true },
+      tooltips: [{
+        type: 'text',
+        content: '请选择是否强制更新字段, 0为不强制更新, 1为强制更新'
+      }]
     }
   ],
   // 定义捷径的返回结果类型
@@ -260,6 +275,7 @@ basekit.addField({
     const mid = formItemParams.mid_field
     const start_date = new Date(start_date_field).toLocaleDateString('en-CA'); // YYYY-MM-DD 格式
     const end_date = new Date(end_date_field).toLocaleDateString('en-CA');
+    const force_update = formItemParams.force_update === 1 ? true : false;
     const body = {
       "data": {
         "offset": 0,
@@ -273,7 +289,8 @@ basekit.addField({
         "end_date": end_date,
         "summary_field": "asin"
       },
-      "path": "/bd/productPerformance/openApi/asinList"
+      "path": "/bd/productPerformance/openApi/asinList",
+      "force_update": force_update
     };
 
     console.log('====body', body);
